@@ -97,6 +97,22 @@ function openStore(directory){
   },
   communications:id=>db.prepare('SELECT * FROM communications WHERE case_id=? ORDER BY id DESC').all(id),
   saveCommunication:(id,v)=>{one(id); if(!String(v.message||'').trim())throw Error('Mensaje vacío'); return Number(db.prepare('INSERT INTO communications(case_id,created_at,type,message,state) VALUES(?,?,?,?,?)').run(id,now(),String(v.type||'Comunicación'),String(v.message),String(v.state||'Preparado')).lastInsertRowid);},
+  cameraPhoto:(id,data)=>{
+    one(id);
+    const count=db.prepare("SELECT COUNT(*) AS n FROM attachments WHERE case_id=? AND original_name LIKE 'Recepción webcam %'").get(id).n;
+    if(count>=4)throw Error('Máximo de cuatro fotos de recepción');
+    if(typeof data!=='string'||!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(data))throw Error('Imagen JPEG inválida');
+    const buffer=Buffer.from(data.slice('data:image/jpeg;base64,'.length),'base64');
+    if(buffer.length<100||buffer.length>5*1024*1024)throw Error('La fotografía debe pesar menos de 5 MB');
+    const folder=path.join(directory,'attachments',String(id));fs.mkdirSync(folder,{recursive:true});
+    const filename='recepcion-'+Date.now()+'-'+require('node:crypto').randomUUID()+'.jpg';
+    const fullpath=path.join(folder,filename);
+    fs.writeFileSync(fullpath,buffer,{flag:'wx'});
+    try{
+      db.prepare('INSERT INTO attachments(case_id,created_at,original_name,stored_name) VALUES(?,?,?,?)').run(id,now(),'Recepción webcam '+(count+1)+'.jpg',filename);
+    }catch(e){fs.rmSync(fullpath,{force:true});throw e;}
+    return {name:filename,total:count+1};
+  },
   attachments:id=>db.prepare('SELECT * FROM attachments WHERE case_id=? ORDER BY id DESC').all(id),
   attach:(id,source)=>{one(id); const dir=path.join(directory,'attachments',String(id));fs.mkdirSync(dir,{recursive:true});const ext=path.extname(source).toLowerCase();if(!['.jpg','.jpeg','.png','.webp','.pdf'].includes(ext))throw Error('Solo JPG, PNG, WEBP o PDF'); const filename=Date.now()+'-'+require('node:crypto').randomUUID()+ext;fs.copyFileSync(source,path.join(dir,filename));db.prepare('INSERT INTO attachments(case_id,created_at,original_name,stored_name) VALUES(?,?,?,?)').run(id,now(),path.basename(source),filename);return true;},
   backup:(destination)=>{fs.mkdirSync(path.dirname(destination),{recursive:true});db.exec('PRAGMA wal_checkpoint(TRUNCATE)');return backup(db,destination).then(()=>destination);}
