@@ -23,6 +23,7 @@ app.whenReady().then(()=>{
  win.webContents.on('preload-error',(_event,file,error)=>logProblem(`Fallo preload ${file}`,error));
  win.webContents.on('render-process-gone',(_event,details)=>logProblem('Proceso interfaz finalizado',JSON.stringify(details)));
  win.loadFile(path.join(__dirname,'index.html')).catch(e=>{console.error('No se pudo abrir la interfaz:',e);dialog.showErrorBox('TECMOV RMA',String(e.message||e));});
+ register('referralUpdates',id=>modules.referralUpdates(id));register('referralProgress',(id,v)=>modules.referralProgress(id,v));
  register('referrals',id=>modules.referrals(id));register('refer',(id,v)=>modules.refer(id,v));register('referralReply',(id,v)=>modules.referralReply(id,v));
  register('entityList',(t,q)=>modules.entityList(t,q));register('entitySave',(t,v)=>modules.entitySave(t,v));register('entityGet',(t,id)=>modules.entityGet(t,id));register('delivery',(id,v)=>modules.delivery(id,v));register('deliveries',id=>modules.deliveries(id));register('auditList',n=>modules.auditList(n));register('stats',()=>modules.stats());register('exportCases',()=>modules.exportCases());
  register('fullBackup',async()=>{const r=await dialog.showSaveDialog(win,{defaultPath:'TECMOV-RMA-respaldo-'+new Date().toISOString().slice(0,10)+'.rma-backup',filters:[{name:'Respaldo TECMOV',extensions:['rma-backup']}]});if(r.canceled)return false;return modules.fullBackup(r.filePath);});
