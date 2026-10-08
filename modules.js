@@ -8,6 +8,8 @@ function installModules(store,directory){
  CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,brand TEXT,model TEXT,sku TEXT,serial TEXT,warranty_months TEXT,notes TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS suppliers(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,contact TEXT,phone TEXT,email TEXT,address TEXT,notes TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS referrals(id INTEGER PRIMARY KEY AUTOINCREMENT,case_id INTEGER NOT NULL REFERENCES cases(id),created_at TEXT NOT NULL,supplier_name TEXT NOT NULL,tracking TEXT,reason TEXT NOT NULL,tests TEXT,accessories TEXT,operator TEXT NOT NULL,reply TEXT,reply_at TEXT);
+ CREATE TABLE IF NOT EXISTS referral_updates(id INTEGER PRIMARY KEY AUTOINCREMENT,referral_id INTEGER NOT NULL REFERENCES referrals(id),created_at TEXT NOT NULL,stage TEXT NOT NULL,note TEXT NOT NULL,tracking TEXT,actor TEXT NOT NULL);
+ CREATE INDEX IF NOT EXISTS idx_referral_updates_referral ON referral_updates(referral_id);
  CREATE TABLE IF NOT EXISTS deliveries(id INTEGER PRIMARY KEY AUTOINCREMENT,case_id INTEGER NOT NULL REFERENCES cases(id),created_at TEXT NOT NULL,recipient TEXT NOT NULL,document TEXT,identity_checked INTEGER NOT NULL,condition TEXT NOT NULL,accessories TEXT,remarks TEXT,operator TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT,created_at TEXT NOT NULL,entity TEXT NOT NULL,entity_id INTEGER,action TEXT NOT NULL,details TEXT NOT NULL,actor TEXT);
  CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit(entity,entity_id);`);
@@ -41,6 +43,24 @@ function installModules(store,directory){
       db.prepare('INSERT INTO events(case_id,created_at,kind,note,actor) VALUES(?,?,?,?,?)').run(ref.case_id,t,'Respuesta de fábrica',reply,String(v.operator||'Operador'));
       audit('referrals',id,'Respuesta',{reply},String(v.operator||'Operador'));
       db.exec('COMMIT');return true;
+    }catch(e){db.exec('ROLLBACK');throw e;}
+  },
+  referralUpdates:id=>db.prepare('SELECT * FROM referral_updates WHERE referral_id=? ORDER BY id DESC').all(id),
+  referralProgress:(id,v)=>{
+    const ref=db.prepare('SELECT * FROM referrals WHERE id=?').get(id);
+    if(!ref)throw Error('Envío a fábrica inexistente');
+    const allowed=['Preparado','Despachado','Recibido por fábrica','En revisión','Respuesta recibida','Devuelto a TECMOV','Finalizado'];
+    const stage=String(v.stage||''),note=String(v.note||'').trim(),actor=String(v.actor||'').trim();
+    if(!allowed.includes(stage)||!note||!actor)throw Error('Completá etapa, observación y responsable');
+    const t=now();
+    db.exec('BEGIN IMMEDIATE');
+    try{
+      const tracking=String(v.tracking||ref.tracking||'');
+      const r=db.prepare('INSERT INTO referral_updates(referral_id,created_at,stage,note,tracking,actor) VALUES(?,?,?,?,?,?)').run(id,t,stage,note,tracking,actor);
+      db.prepare('UPDATE referrals SET tracking=? WHERE id=?').run(tracking,id);
+      db.prepare('INSERT INTO events(case_id,created_at,kind,note,actor) VALUES(?,?,?,?,?)').run(ref.case_id,t,'Seguimiento fábrica',stage+': '+note,actor);
+      audit('referrals',id,'Seguimiento',{stage,note,tracking},actor);
+      db.exec('COMMIT');return Number(r.lastInsertRowid);
     }catch(e){db.exec('ROLLBACK');throw e;}
   },
   deliveries:id=>db.prepare('SELECT * FROM deliveries WHERE case_id=? ORDER BY id DESC').all(id),
