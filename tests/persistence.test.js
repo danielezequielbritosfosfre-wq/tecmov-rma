@@ -9,6 +9,18 @@ test('RMA persiste edicion auditada y derivaciones tras reabrir',()=>{
  try{
   let store=openStore(dir);const mods=installModules(store,dir);
   const created=store.create({customer_name:'Persona de prueba',product:'Cable',brand:'SOUL',claim:'No carga',physical_condition:'Sin daños',quantity:1});
+  const extra=store.create({customer_name:'Papelera test',product:'Cable USB',brand:'SOUL',claim:'No funciona',physical_condition:'Sin daño'});
+  assert.equal(store.list('').some(x=>x.id===extra.id),true);
+  store.archive(extra.id,{actor:'Admin',reason:'Ingreso duplicado'});
+  assert.equal(store.list('').some(x=>x.id===extra.id),false);
+  assert.equal(store.trash('').some(x=>x.id===extra.id),true);
+  assert.throws(()=>store.edit(extra.id,{phone:'1',actor:'Admin'}),/archivado/);
+  store.restoreCase(extra.id,{actor:'Admin'});
+  assert.equal(store.list('').some(x=>x.id===extra.id),true);
+  store.annul(extra.id,{actor:'Admin',reason:'Registro duplicado'});
+  assert.equal(store.get(extra.id).status,'Anulado');
+  assert.throws(()=>store.updateStatus(extra.id,{status:'En evaluación'}),/anulado/);
+  assert.ok(store.timeline(extra.id).some(x=>x.kind==='Anulación'));
   const edited=store.edit(created.id,{phone:'3511234567',actor:'Pruebas'});
   assert.equal(edited.phone,'3511234567');
   assert.ok(store.get(created.id).customer_ref_id);
