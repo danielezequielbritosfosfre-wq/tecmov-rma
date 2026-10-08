@@ -17,6 +17,8 @@ test('RMA persiste edicion auditada y derivaciones tras reabrir',()=>{
   assert.equal(store.get(created.id).phone,'3511234567');
   mods.refer(created.id,{supplier_name:'Fabricante prueba',reason:'Carga intermitente',operator:'Pruebas'});
   assert.equal(mods.referrals(created.id).length,1);
+  assert.throws(()=>store.cameraPhoto(created.id,'no-photo'),/inválida/);
+  assert.equal(store.attachments(created.id).length,0);
   const referral=mods.referrals(created.id)[0];
   mods.referralProgress(referral.id,{stage:'Despachado',note:'Remito de prueba',actor:'Pruebas',tracking:'TRACK-123'});
   assert.equal(mods.referralUpdates(referral.id).length,1);
