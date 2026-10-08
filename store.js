@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const { DatabaseSync, backup } = require('node:sqlite');
+const { DatabaseSync } = require('node:sqlite');
 const STATUSES = ['Recibido','Pendiente de evaluación','En evaluación','Pendiente de información','Enviado al proveedor','Enviado al fabricante','Aguardando respuesta','Garantía aprobada','Garantía rechazada','Cambio autorizado','Producto reemplazado','Reintegro autorizado','Disponible para retirar','Entregado al cliente','Cerrado'];
 const FIELDS = ['customer_name','customer_id','phone','email','address','purchase_date','invoice_type','invoice_number','invoice_file','purchase_price','brand','product','model','sku','serial','quantity','accessories','claim','physical_condition','reception_notes','internal_notes','branch','type','assigned_user'];
 function openStore(directory){
@@ -115,7 +115,7 @@ function openStore(directory){
   },
   attachments:id=>db.prepare('SELECT * FROM attachments WHERE case_id=? ORDER BY id DESC').all(id),
   attach:(id,source)=>{one(id); const dir=path.join(directory,'attachments',String(id));fs.mkdirSync(dir,{recursive:true});const ext=path.extname(source).toLowerCase();if(!['.jpg','.jpeg','.png','.webp','.pdf'].includes(ext))throw Error('Solo JPG, PNG, WEBP o PDF'); const filename=Date.now()+'-'+require('node:crypto').randomUUID()+ext;fs.copyFileSync(source,path.join(dir,filename));db.prepare('INSERT INTO attachments(case_id,created_at,original_name,stored_name) VALUES(?,?,?,?)').run(id,now(),path.basename(source),filename);return true;},
-  backup:(destination)=>{fs.mkdirSync(path.dirname(destination),{recursive:true});db.exec('PRAGMA wal_checkpoint(TRUNCATE)');return backup(db,destination).then(()=>destination);}
+  backup:(destination)=>{fs.mkdirSync(path.dirname(destination),{recursive:true});db.exec('PRAGMA wal_checkpoint(TRUNCATE)');db.exec("VACUUM INTO '"+destination.replace(/'/g,"''")+"'");return Promise.resolve(destination);}
  };
 }
 module.exports={openStore,STATUSES};
