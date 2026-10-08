@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test tests/persistence.test.js tests/restore.test.js tests/license.test.js",
+    "test": "node --test tests/persistence.test.js tests/restore.test.js tests/license.test.js tests/auth.test.js",
     "dist:win": "electron-builder --win nsis --publish never"
   },
   "dependencies": {},
@@ -31,7 +31,8 @@
       "tecmov-logo.png",
       "package.json",
       "logo-transparent.js",
-      "license.js"
+      "license.js",
+      "auth.js"
     ],
     "win": {
       "target": "nsis"
