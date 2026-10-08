@@ -16,6 +16,8 @@ function openStore(directory){
  CREATE TABLE IF NOT EXISTS case_edits(id INTEGER PRIMARY KEY AUTOINCREMENT,case_id INTEGER NOT NULL REFERENCES cases(id),created_at TEXT NOT NULL,actor TEXT NOT NULL,changes TEXT NOT NULL);
  CREATE INDEX IF NOT EXISTS idx_cases_invoice ON cases(invoice_number);
  CREATE INDEX IF NOT EXISTS idx_cases_customer ON cases(customer_name);`);
+ const colsCases=db.prepare('PRAGMA table_info(cases)').all().map(x=>x.name);
+ if(!colsCases.includes('customer_ref_id'))db.exec('ALTER TABLE cases ADD COLUMN customer_ref_id INTEGER REFERENCES customers(id)');
  if(!db.prepare('SELECT value FROM settings WHERE key=?').get('shop_name')) db.prepare('INSERT INTO settings(key,value) VALUES(?,?)').run('shop_name','TECMOV Accesorios');
  const now=()=>new Date().toISOString();
  const one=id=>{ const row=db.prepare('SELECT * FROM cases WHERE id=?').get(id); if(!row) throw Error('RMA no encontrado'); return row; };
@@ -31,7 +33,19 @@ function openStore(directory){
    const t=now();
    db.exec('BEGIN IMMEDIATE');
    try{
-    const cols=['created_at','updated_at','status',...FIELDS]; const vals=[t,t,'Recibido',...FIELDS.map(k=>k==='quantity'?Number(v[k]||1):String(v[k]??''))];
+    let customerRef=v.customer_ref_id?Number(v.customer_ref_id):null;
+    if(customerRef){
+      const selected=db.prepare('SELECT id FROM customers WHERE id=?').get(customerRef);
+      if(!selected)throw Error('El cliente seleccionado no existe');
+    }else{
+      const doc=String(v.customer_id||'').trim(),phone=String(v.phone||'').trim(),name=String(v.customer_name||'').trim();
+      let found=doc?db.prepare('SELECT id FROM customers WHERE document=? LIMIT 1').get(doc):null;
+      if(!found&&phone)found=db.prepare('SELECT id FROM customers WHERE phone=? LIMIT 1').get(phone);
+      if(!found&&name)found=db.prepare('SELECT id FROM customers WHERE lower(name)=lower(?) LIMIT 1').get(name);
+      if(found)customerRef=found.id;
+      else customerRef=Number(db.prepare('INSERT INTO customers(name,document,phone,email,address,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').run(name,doc,phone,String(v.email||''),String(v.address||''),t,t).lastInsertRowid);
+    }
+    const cols=['created_at','updated_at','status','customer_ref_id',...FIELDS]; const vals=[t,t,'Recibido',customerRef,...FIELDS.map(k=>k==='quantity'?Number(v[k]||1):String(v[k]??''))];
     const result=db.prepare(`INSERT INTO cases (${cols.join(',')}) VALUES(${cols.map(()=>'?').join(',')})`).run(...vals);
     const id=Number(result.lastInsertRowid); const code=`RMA-${String(id).padStart(8,'0')}`;
     db.prepare('UPDATE cases SET code=? WHERE id=?').run(code,id);
