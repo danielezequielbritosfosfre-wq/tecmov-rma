@@ -95,7 +95,7 @@ function openStore(directory){
   trash:(query='')=>db.prepare('SELECT * FROM cases WHERE archived_at IS NOT NULL AND (code LIKE ? OR customer_name LIKE ? OR product LIKE ?) ORDER BY id DESC LIMIT 500').all(...Array(3).fill('%'+String(query).trim()+'%')),
   timeline:id=>db.prepare('SELECT * FROM events WHERE case_id=? ORDER BY id DESC').all(id),
   updateStatus:(id,v)=>{
-   const row=one(id);if(row.archived_at||row.status==='Anulado')throw Error('Este RMA está archivado o anulado');if(!STATUSES.includes(v.status))throw Error('Estado inválido');
+   const row=one(id);if(row.archived_at||row.status==='Anulado')throw Error('Este RMA está archivado o anulado');if(!STATUSES.includes(v.status)||v.status==='Anulado')throw Error('Para anular un RMA usá la acción Anular con motivo y responsable');
    const note=String(v.note||'').trim();
    if(v.status==='Garantía rechazada' && (!String(v.tests||row.tests||'').trim() || !String(v.diagnosis||row.diagnosis||'').trim() || !String(v.resolution_reason||row.resolution_reason||'').trim())) throw Error('El rechazo requiere pruebas, diagnóstico y fundamento documentados.');
    if(v.status==='Garantía rechazada' && !note)throw Error('Indicá el motivo del cambio de estado.');
