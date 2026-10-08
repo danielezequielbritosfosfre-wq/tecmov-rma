@@ -1,13 +1,13 @@
 {
   "name": "tecmov-rma",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": true,
   "description": "Gestión local de ingresos y garantías RMA",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test tests/*.test.js",
-    "dist:win": "electron-builder --win nsis"
+    "test": "node --test tests/persistence.test.js tests/restore.test.js tests/license.test.js tests/auth.test.js",
+    "dist:win": "electron-builder --win nsis --publish never"
   },
   "dependencies": {},
   "devDependencies": {
@@ -29,15 +29,24 @@
       "renderer.js",
       "style.css",
       "tecmov-logo.png",
-      "package.json"
+      "package.json",
+      "logo-transparent.js",
+      "license.js",
+      "auth.js"
     ],
     "win": {
       "target": "nsis"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TECMOV RMA",
+      "deleteAppDataOnUninstall": false
     },
-    "asar": true
-  }
+    "asar": true,
+    "compression": "maximum"
+  },
+  "author": "TECMOV Accesorios"
 }
