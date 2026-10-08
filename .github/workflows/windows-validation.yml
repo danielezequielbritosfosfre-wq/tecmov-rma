@@ -1,0 +1,32 @@
+name: TECMOV RMA - Validacion Windows
+on:
+  push:
+    branches: [desarrollo-rma-seguridad-modulos]
+  workflow_dispatch:
+jobs:
+  windows-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Verificar sintaxis JavaScript
+        shell: pwsh
+        run: |
+          foreach ($f in @('main.js','preload.js','store.js','modules.js','renderer.js')) {
+            node --check $f
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Pruebas automatizadas
+        run: npm test
+      - name: Compilar instalador Windows
+        run: npm run dist:win
+      - name: Publicar instalador de prueba
+        uses: actions/upload-artifact@v4
+        with:
+          name: TECMOV-RMA-windows-prueba
+          path: dist/*.exe
