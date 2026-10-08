@@ -29,7 +29,8 @@
       "renderer.js",
       "style.css",
       "tecmov-logo.png",
-      "package.json"
+      "package.json",
+      "logo-transparent.js"
     ],
     "win": {
       "target": "nsis"
