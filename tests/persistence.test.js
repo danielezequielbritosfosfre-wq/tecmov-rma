@@ -10,7 +10,9 @@ test('RMA persiste edicion auditada y derivaciones tras reabrir',()=>{
   let store=openStore(dir);const mods=installModules(store,dir);
   const created=store.create({customer_name:'Persona de prueba',product:'Cable',brand:'SOUL',claim:'No carga',physical_condition:'Sin daños',quantity:1});
   const edited=store.edit(created.id,{phone:'3511234567',actor:'Pruebas'});
-  assert.equal(edited.phone,'3511234567');assert.equal(store.edits(created.id).length,1);
+  assert.equal(edited.phone,'3511234567');
+  assert.ok(store.get(created.id).customer_ref_id);
+  assert.equal(mods.entityList('customers','Persona de prueba').length,1);assert.equal(store.edits(created.id).length,1);
   assert.throws(()=>store.edit(created.id,{phone:'0',actor:''}),/responsable/i);
   assert.equal(store.get(created.id).phone,'3511234567');
   mods.refer(created.id,{supplier_name:'Fabricante prueba',reason:'Carga intermitente',operator:'Pruebas'});
