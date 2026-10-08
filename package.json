@@ -3,7 +3,7 @@
   "version": "0.2.2",
   "private": true,
   "description": "Gestión local de ingresos y garantías RMA",
-  "main": "src/main.js",
+  "main": "main.js",
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.js",
@@ -21,7 +21,14 @@
       "output": "dist"
     },
     "files": [
-      "src/**/*",
+      "main.js",
+      "preload.js",
+      "modules.js",
+      "store.js",
+      "index.html",
+      "renderer.js",
+      "style.css",
+      "tecmov-logo.png",
       "package.json"
     ],
     "win": {
