@@ -3,8 +3,9 @@ const {app,BrowserWindow,ipcMain,dialog,shell,clipboard,Menu}=require('electron'
 const path=require('node:path');
 const {openStore}=require('./store');
 const {installModules}=require('./modules');
+const {createAuth}=require('./auth');
 const fs=require('node:fs');
-let win,store,modules;
+let win,store,modules,auth;
 const dataDir=app.getPath('userData');
 const logFile=path.join(dataDir,'diagnostico-arranque.log');
 function logProblem(kind,error){
@@ -13,11 +14,14 @@ function logProblem(kind,error){
 }
 process.on('uncaughtException',e=>logProblem('uncaughtException',e));
 process.on('unhandledRejection',e=>logProblem('unhandledRejection',e));
-const register=(name,fn)=>ipcMain.handle(name,async(_event,...args)=>fn(...args));
+const register=(name,fn)=>ipcMain.handle(name,async(_event,...args)=>{auth.authorize(name);return fn(...args)});
+const authRegister=(name,fn)=>ipcMain.handle(name,async(_event,...args)=>fn(...args));
 app.whenReady().then(()=>{
  Menu.setApplicationMenu(null);
- try{store=openStore(dataDir);modules=installModules(store,dataDir);}
+ try{store=openStore(dataDir);modules=installModules(store,dataDir);auth=createAuth(store.db);}
  catch(e){logProblem('Fallo al abrir almacenamiento',e);dialog.showErrorBox('TECMOV RMA - almacenamiento',`No se pudo iniciar la base de datos. No se modificaron ni borraron tus datos.\n\n${String(e?.message||e)}\n\nDiagnóstico: ${logFile}`);app.quit();return;}
+ authRegister('authInfo',()=>auth.info());authRegister('authSetup',(name,password)=>auth.setup(name,password));authRegister('authLogin',(name,password)=>auth.login(name,password));authRegister('authLogout',()=>auth.logout());
+ register('usersList',()=>auth.listUsers());register('usersAdd',(name,password,role)=>auth.addUser(name,password,role));register('usersDisable',id=>auth.disableUser(id));
  const scheduleBackup=async()=>{try{const dir=path.join(app.getPath('userData'),'automatic-backups');fs.mkdirSync(dir,{recursive:true});const day=new Date().toISOString().slice(0,10);const file=path.join(dir,'TECMOV-'+day+'.rma-backup');if(!fs.existsSync(file))await modules.fullBackup(file);const saved=fs.readdirSync(dir).filter(f=>f.endsWith('.rma-backup')).sort().reverse();for(const old of saved.slice(14))fs.rmSync(path.join(dir,old));}catch(e){console.error('Error al respaldar:',e);}};
  scheduleBackup();
  win=new BrowserWindow({width:1360,height:860,minWidth:990,minHeight:680,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
