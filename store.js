@@ -13,6 +13,7 @@ function openStore(directory){
  CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, case_id INTEGER NOT NULL REFERENCES cases(id), created_at TEXT NOT NULL, kind TEXT NOT NULL, old_status TEXT, new_status TEXT, note TEXT, actor TEXT);
  CREATE TABLE IF NOT EXISTS communications(id INTEGER PRIMARY KEY AUTOINCREMENT, case_id INTEGER NOT NULL REFERENCES cases(id), created_at TEXT NOT NULL, type TEXT NOT NULL, message TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'Preparado');
  CREATE TABLE IF NOT EXISTS attachments(id INTEGER PRIMARY KEY AUTOINCREMENT, case_id INTEGER NOT NULL REFERENCES cases(id), created_at TEXT NOT NULL, original_name TEXT NOT NULL, stored_name TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS case_edits(id INTEGER PRIMARY KEY AUTOINCREMENT,case_id INTEGER NOT NULL REFERENCES cases(id),created_at TEXT NOT NULL,actor TEXT NOT NULL,changes TEXT NOT NULL);
  CREATE INDEX IF NOT EXISTS idx_cases_invoice ON cases(invoice_number);
  CREATE INDEX IF NOT EXISTS idx_cases_customer ON cases(customer_name);`);
  if(!db.prepare('SELECT value FROM settings WHERE key=?').get('shop_name')) db.prepare('INSERT INTO settings(key,value) VALUES(?,?)').run('shop_name','TECMOV Accesorios');
@@ -39,6 +40,31 @@ function openStore(directory){
    }catch(e){db.exec('ROLLBACK');throw e;}
   },
   get:one,
+  edit:(id,v)=>{
+    const old=one(id);
+    if(old.delivered_at)throw Error('No se puede editar un expediente entregado');
+    const allowed=FIELDS.filter(k=>k in v);
+    const actor=String(v.actor||'').trim();
+    if(!actor)throw Error('Indicá el responsable');
+    const changed=allowed.filter(k=>String(v[k]??'')!==String(old[k]??''));
+    if(!changed.length)return old;
+    const next={...old,...Object.fromEntries(changed.map(k=>[k,v[k]]))};
+    for(const k of ['customer_name','product','brand','claim','physical_condition'])if(!String(next[k]||'').trim())throw Error('Campo obligatorio: '+k);
+    if(!Number.isInteger(Number(next.quantity))||Number(next.quantity)<1)throw Error('Cantidad inválida');
+    db.exec('BEGIN IMMEDIATE');
+    try{
+      const t=now(),changes=Object.fromEntries(changed.map(k=>[k,{before:old[k],after:next[k]}]));
+      db.prepare('UPDATE cases SET '+changed.map(k=>k+'=?').join(',')+',updated_at=? WHERE id=?').run(...changed.map(k=>k==='quantity'?Number(v[k]):String(v[k]??'')),t,id);
+      db.prepare('INSERT INTO case_edits(case_id,created_at,actor,changes) VALUES(?,?,?,?)').run(id,t,actor,JSON.stringify(changes));
+      log(id,'Edición',old.status,old.status,'Campos: '+changed.join(', '),actor);
+      db.exec('COMMIT');return one(id);
+    }catch(e){db.exec('ROLLBACK');throw e;}
+  },
+  edits:id=>{one(id);return db.prepare('SELECT * FROM case_edits WHERE case_id=? ORDER BY id DESC').all(id);},
+  alerts:()=>{
+    const rows=db.prepare("SELECT id,code,customer_name,product,status,created_at FROM cases WHERE status NOT IN ('Entregado al cliente','Cerrado') ORDER BY id DESC").all();
+    return rows.map(x=>({...x,days_open:Math.max(0,Math.floor((Date.now()-Date.parse(x.created_at))/86400000))})).filter(x=>x.days_open>=7);
+  },
   list:(query='')=>db.prepare('SELECT * FROM cases WHERE code LIKE ? OR customer_name LIKE ? OR invoice_number LIKE ? OR product LIKE ? OR phone LIKE ? ORDER BY id DESC LIMIT 500').all(...Array(5).fill('%'+String(query).trim()+'%')),
   timeline:id=>db.prepare('SELECT * FROM events WHERE case_id=? ORDER BY id DESC').all(id),
   updateStatus:(id,v)=>{
