@@ -28,3 +28,5 @@ details.rma-details.card{margin-top:12px}
 .rma-details[open] summary{margin-bottom:15px}
 .rma-details .timeline{margin-top:12px}
 @media(max-width:900px){.summary-grid{grid-template-columns:1fr}}
+
+.upload-photos{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid #cad5d9;border-radius:9px;background:#fff;color:#28414b;font-size:14px;font-weight:600;cursor:pointer}.upload-photos:hover{background:#f3f7f8}.photo-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
