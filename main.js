@@ -33,6 +33,7 @@ app.whenReady().then(()=>{
  register('health',()=>({ok:true,storage:dataDir,sqlite:store.db.prepare('PRAGMA integrity_check').get().integrity_check,version:app.getVersion()}));
  register('reportFiltered',v=>store.reportFiltered(v));
  register('edit',(id,v)=>store.edit(id,v));register('edits',id=>store.edits(id));register('alerts',()=>store.alerts());
+ register('annul',(id,v)=>store.annul(id,v));register('archive',(id,v)=>store.archive(id,v));register('restoreCase',(id,v)=>store.restoreCase(id,v));register('trash',q=>store.trash(q));
  register('list',q=>store.list(q));register('create',v=>store.create(v));register('get',id=>store.get(id));register('statuses',()=>store.statuses);
  register('timeline',id=>store.timeline(id));register('status', (id,v)=>store.updateStatus(id,v));
  register('settings',()=>store.settings());register('saveSettings',v=>store.saveSettings(v));register('communications',id=>store.communications(id));register('saveCommunication',(id,v)=>store.saveCommunication(id,v));
