@@ -1,11 +1,14 @@
-name: TECMOV RMA - Validacion Windows
+name: TECMOV RMA - Instalador Windows
 on:
+  workflow_dispatch:
   push:
     branches: [desarrollo-rma-seguridad-modulos]
-  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  windows-check:
+  build-windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,19 +17,23 @@ jobs:
           cache: npm
       - name: Instalar dependencias
         run: npm ci
-      - name: Verificar sintaxis JavaScript
+      - name: Revisar sintaxis
         shell: pwsh
         run: |
-          foreach ($f in @('main.js','preload.js','store.js','modules.js','renderer.js')) {
+          foreach ($f in @('main.js','preload.js','store.js','modules.js','renderer.js','logo-transparent.js','restore.js')) {
             node --check $f
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-      - name: Pruebas automatizadas
+      - name: Pruebas de persistencia
         run: npm test
-      - name: Compilar instalador Windows
+      - name: Generar instalador de Windows
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run dist:win
-      - name: Publicar instalador de prueba
+      - name: Adjuntar instalador ejecutable
         uses: actions/upload-artifact@v4
         with:
-          name: TECMOV-RMA-windows-prueba
+          name: TECMOV-RMA-Instalador-Windows
           path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 30
