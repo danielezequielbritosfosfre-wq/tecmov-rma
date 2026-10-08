@@ -19,10 +19,14 @@ function verify(file){
 function restore(file,destination,{appClosed=false}={}){
  if(!appClosed)throw Error('La aplicación debe estar cerrada antes de restaurar');
  const data=verify(file);
+ fs.mkdirSync(path.dirname(destination),{recursive:true});
  const staging=fs.mkdtempSync(path.join(path.dirname(destination),'tecmov-restore-staging-'));
  const old=path.join(path.dirname(destination),'tecmov-before-restore-'+Date.now());
  try{
   for(const entry of data.files){const target=path.join(staging,...entry.name.split('/'));fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,Buffer.from(entry.bytes,'base64'),{flag:'wx'});}
+  const {DatabaseSync}=require('node:sqlite');
+  const verificationDb=new DatabaseSync(path.join(staging,'rma.sqlite'),{readOnly:true});
+  try{if(verificationDb.prepare('PRAGMA integrity_check').get().integrity_check!=='ok')throw Error('La base recuperada no supera el control SQLite');}finally{verificationDb.close();}
   if(fs.existsSync(destination))fs.cpSync(destination,old,{recursive:true,errorOnExist:true,force:false});
   const keep=path.join(destination,'attachments');
   fs.mkdirSync(destination,{recursive:true});
