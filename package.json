@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/persistence.test.js tests/restore.test.js",
-    "dist:win": "electron-builder --win nsis"
+    "dist:win": "electron-builder --win nsis --publish never"
   },
   "dependencies": {},
   "devDependencies": {
@@ -45,5 +45,6 @@
     },
     "asar": true,
     "compression": "maximum"
-  }
+  },
+  "author": "TECMOV Accesorios"
 }
