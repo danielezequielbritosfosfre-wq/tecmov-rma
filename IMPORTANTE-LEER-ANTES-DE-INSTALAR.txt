@@ -1,0 +1,15 @@
+TECMOV RMA v0.2.2 - Corrección puente Electron / SQLite
+
+1. Cerrá TECMOV RMA por completo.
+2. Antes de instalar, resguardá esta carpeta (si existe):
+   %APPDATA%\tecmov-rma
+   Copiala completa a otra ubicación, con la aplicación cerrada.
+3. NO borres la carpeta anterior ni limpies datos de la aplicación.
+4. Ejecutá CREAR-INSTALADOR-WINDOWS.cmd en una PC Windows con Node.js y acceso a Internet.
+5. Instalá el nuevo .exe generado en dist. La instalación NO incluye ninguna acción para borrar datos anteriores.
+6. Al iniciar, la aplicación valida comunicación y estado SQLite antes de habilitar el guardado.
+7. Creá un expediente de prueba, cerrá y reabrí para confirmar que continúa guardado.
+
+Si persiste el error, compartí el mensaje exacto y el archivo diagnostico-arranque.log ubicado en %APPDATA%\tecmov-rma. NO compartas rma.sqlite si contiene información de clientes.
+
+NOTA: Este paquete contiene código fuente, NO un EXE precompilado. La compilación y funcionamiento sobre Windows todavía no están verificados en este entorno.

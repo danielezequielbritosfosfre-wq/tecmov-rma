@@ -1,0 +1,36 @@
+{
+  "name": "tecmov-rma",
+  "version": "0.2.2",
+  "private": true,
+  "description": "Gestión local de ingresos y garantías RMA",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "ar.com.tecmov.rma",
+    "productName": "TECMOV RMA",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "asar": true
+  }
+}
