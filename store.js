@@ -75,6 +75,12 @@ function openStore(directory){
     }catch(e){db.exec('ROLLBACK');throw e;}
   },
   edits:id=>{one(id);return db.prepare('SELECT * FROM case_edits WHERE case_id=? ORDER BY id DESC').all(id);},
+  reportFiltered:(options={})=>{
+    const status=String(options.status||''),search=String(options.search||'').trim(),from=String(options.from||''),to=String(options.to||'');
+    const sql="SELECT id,code,created_at,customer_name,product,brand,invoice_number,status FROM cases WHERE (?='' OR status=?) AND (?='' OR code LIKE ? OR customer_name LIKE ? OR product LIKE ?) AND (?='' OR substr(created_at,1,10)>=?) AND (?='' OR substr(created_at,1,10)<=?) ORDER BY id DESC LIMIT 5000";
+    const q='%'+search+'%';
+    return db.prepare(sql).all(status,status,search,q,q,q,from,from,to,to);
+  },
   alerts:()=>{
     const rows=db.prepare("SELECT id,code,customer_name,product,status,created_at FROM cases WHERE status NOT IN ('Entregado al cliente','Cerrado') ORDER BY id DESC").all();
     return rows.map(x=>({...x,days_open:Math.max(0,Math.floor((Date.now()-Date.parse(x.created_at))/86400000))})).filter(x=>x.days_open>=7);
