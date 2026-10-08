@@ -1,0 +1,39 @@
+name: Generar instalador TECMOV RMA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Obtener version en desarrollo
+        uses: actions/checkout@v4
+        with:
+          ref: desarrollo-rma-seguridad-modulos
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+      - name: Dependencias
+        run: npm ci
+      - name: Verificacion de sintaxis
+        shell: pwsh
+        run: |
+          foreach ($f in @('main.js','preload.js','store.js','modules.js','renderer.js','restore.js','logo-transparent.js')) {
+            node --check $f
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Pruebas
+        run: npm test
+      - name: Crear instalador
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist:win
+      - name: Guardar instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: TECMOV-RMA-Instalador-Windows
+          path: dist/*.exe
+          if-no-files-found: error
