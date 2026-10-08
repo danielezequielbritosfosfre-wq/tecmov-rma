@@ -30,6 +30,7 @@ app.whenReady().then(()=>{
  register('verifyBackup',async()=>{const r=await dialog.showOpenDialog(win,{properties:['openFile'],filters:[{name:'Respaldo TECMOV',extensions:['rma-backup']}]});if(r.canceled)return false;const data=modules.verifyBackup(r.filePaths[0]);return {name:path.basename(r.filePaths[0]),created_at:data.created_at,files:data.files.length};});
  register('exportCSV',async()=>{const rows=modules.exportCases();const r=await dialog.showSaveDialog(win,{defaultPath:'TECMOV-RMA-reporte.csv',filters:[{name:'CSV',extensions:['csv']}]});if(r.canceled)return false;const cols=Object.keys(rows[0]||{code:'',status:'',customer_name:'',product:''});const cell=v=>'"'+String(v??'').replace(/"/g,'""')+'"';fs.writeFileSync(r.filePath,'\ufeff'+cols.join(';')+'\r\n'+rows.map(x=>cols.map(k=>cell(x[k])).join(';')).join('\r\n'));return r.filePath;});
  register('health',()=>({ok:true,storage:dataDir,sqlite:store.db.prepare('PRAGMA integrity_check').get().integrity_check,version:app.getVersion()}));
+ register('reportFiltered',v=>store.reportFiltered(v));
  register('edit',(id,v)=>store.edit(id,v));register('edits',id=>store.edits(id));register('alerts',()=>store.alerts());
  register('list',q=>store.list(q));register('create',v=>store.create(v));register('get',id=>store.get(id));register('statuses',()=>store.statuses);
  register('timeline',id=>store.timeline(id));register('status', (id,v)=>store.updateStatus(id,v));
