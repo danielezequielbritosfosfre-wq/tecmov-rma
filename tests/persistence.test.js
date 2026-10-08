@@ -17,11 +17,16 @@ test('RMA persiste edicion auditada y derivaciones tras reabrir',()=>{
   assert.equal(store.get(created.id).phone,'3511234567');
   mods.refer(created.id,{supplier_name:'Fabricante prueba',reason:'Carga intermitente',operator:'Pruebas'});
   assert.equal(mods.referrals(created.id).length,1);
+  const referral=mods.referrals(created.id)[0];
+  mods.referralProgress(referral.id,{stage:'Despachado',note:'Remito de prueba',actor:'Pruebas',tracking:'TRACK-123'});
+  assert.equal(mods.referralUpdates(referral.id).length,1);
+  assert.throws(()=>mods.referralProgress(referral.id,{stage:'Desconocido',note:'X',actor:'Pruebas'}),/etapa/i);
   store.db.close();
   store=openStore(dir);const reopened=installModules(store,dir);
   assert.equal(store.get(created.id).phone,'3511234567');
   assert.equal(store.edits(created.id).length,1);
   assert.equal(reopened.referrals(created.id).length,1);
+  assert.equal(reopened.referralUpdates(referral.id)[0].tracking,'TRACK-123');
   store.db.close();
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
