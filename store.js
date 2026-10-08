@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
-const STATUSES = ['Recibido','Pendiente de evaluación','En evaluación','Pendiente de información','Enviado al proveedor','Enviado al fabricante','Aguardando respuesta','Garantía aprobada','Garantía rechazada','Cambio autorizado','Producto reemplazado','Reintegro autorizado','Disponible para retirar','Entregado al cliente','Cerrado'];
+const STATUSES = ['Recibido','Pendiente de evaluación','En evaluación','Pendiente de información','Enviado al proveedor','Enviado al fabricante','Aguardando respuesta','Garantía aprobada','Garantía rechazada','Cambio autorizado','Producto reemplazado','Reintegro autorizado','Disponible para retirar','Entregado al cliente','Cerrado','Anulado'];
 const FIELDS = ['customer_name','customer_id','phone','email','address','purchase_date','invoice_type','invoice_number','invoice_file','purchase_price','brand','product','model','sku','serial','quantity','accessories','claim','physical_condition','reception_notes','internal_notes','branch','type','assigned_user'];
 function openStore(directory){
  fs.mkdirSync(directory,{recursive:true});
@@ -17,6 +17,9 @@ function openStore(directory){
  CREATE INDEX IF NOT EXISTS idx_cases_invoice ON cases(invoice_number);
  CREATE INDEX IF NOT EXISTS idx_cases_customer ON cases(customer_name);`);
  const colsCases=db.prepare('PRAGMA table_info(cases)').all().map(x=>x.name);
+ if(!colsCases.includes('archived_at'))db.exec('ALTER TABLE cases ADD COLUMN archived_at TEXT');
+ if(!colsCases.includes('annul_reason'))db.exec('ALTER TABLE cases ADD COLUMN annul_reason TEXT');
+ if(!colsCases.includes('annul_actor'))db.exec('ALTER TABLE cases ADD COLUMN annul_actor TEXT');
  if(!colsCases.includes('customer_ref_id'))db.exec('ALTER TABLE cases ADD COLUMN customer_ref_id INTEGER REFERENCES customers(id)');
  if(!db.prepare('SELECT value FROM settings WHERE key=?').get('shop_name')) db.prepare('INSERT INTO settings(key,value) VALUES(?,?)').run('shop_name','TECMOV Accesorios');
  const now=()=>new Date().toISOString();
@@ -54,9 +57,12 @@ function openStore(directory){
    }catch(e){db.exec('ROLLBACK');throw e;}
   },
   get:one,
+  archive:(id,{actor,reason}={})=>{const row=one(id);if(row.archived_at)throw Error('El expediente ya está en papelera');if(!String(actor||'').trim()||!String(reason||'').trim())throw Error('Indicá responsable y motivo');const t=now();db.prepare('UPDATE cases SET archived_at=?,updated_at=? WHERE id=?').run(t,t,id);log(id,'Papelera',row.status,row.status,String(reason),String(actor));return one(id);},
+  restoreCase:(id,{actor}={})=>{const row=one(id);if(!row.archived_at)throw Error('El expediente no está en papelera');if(!String(actor||'').trim())throw Error('Indicá responsable');db.prepare('UPDATE cases SET archived_at=NULL,updated_at=? WHERE id=?').run(now(),id);log(id,'Restauración',row.status,row.status,'Recuperado de papelera',String(actor));return one(id);},
+  annul:(id,{actor,reason}={})=>{const row=one(id);if(row.status==='Anulado')throw Error('El expediente ya está anulado');if(row.delivered_at)throw Error('No puede anularse un expediente entregado');if(!String(actor||'').trim()||!String(reason||'').trim())throw Error('Indicá responsable y motivo');const t=now();db.prepare('UPDATE cases SET status=?,annul_reason=?,annul_actor=?,updated_at=? WHERE id=?').run('Anulado',String(reason),String(actor),t,id);log(id,'Anulación',row.status,'Anulado',String(reason),String(actor));return one(id);},
   edit:(id,v)=>{
     const old=one(id);
-    if(old.delivered_at)throw Error('No se puede editar un expediente entregado');
+    if(old.delivered_at||old.archived_at||old.status==='Anulado')throw Error('No se puede editar un expediente entregado, archivado o anulado');
     const allowed=FIELDS.filter(k=>k in v);
     const actor=String(v.actor||'').trim();
     if(!actor)throw Error('Indicá el responsable');
@@ -77,18 +83,19 @@ function openStore(directory){
   edits:id=>{one(id);return db.prepare('SELECT * FROM case_edits WHERE case_id=? ORDER BY id DESC').all(id);},
   reportFiltered:(options={})=>{
     const status=String(options.status||''),search=String(options.search||'').trim(),from=String(options.from||''),to=String(options.to||'');
-    const sql="SELECT id,code,created_at,customer_name,product,brand,invoice_number,status FROM cases WHERE (?='' OR status=?) AND (?='' OR code LIKE ? OR customer_name LIKE ? OR product LIKE ?) AND (?='' OR substr(created_at,1,10)>=?) AND (?='' OR substr(created_at,1,10)<=?) ORDER BY id DESC LIMIT 5000";
+    const sql="SELECT id,code,created_at,customer_name,product,brand,invoice_number,status FROM cases WHERE archived_at IS NULL AND (?='' OR status=?) AND (?='' OR code LIKE ? OR customer_name LIKE ? OR product LIKE ?) AND (?='' OR substr(created_at,1,10)>=?) AND (?='' OR substr(created_at,1,10)<=?) ORDER BY id DESC LIMIT 5000";
     const q='%'+search+'%';
     return db.prepare(sql).all(status,status,search,q,q,q,from,from,to,to);
   },
   alerts:()=>{
-    const rows=db.prepare("SELECT id,code,customer_name,product,status,created_at FROM cases WHERE status NOT IN ('Entregado al cliente','Cerrado') ORDER BY id DESC").all();
+    const rows=db.prepare("SELECT id,code,customer_name,product,status,created_at FROM cases WHERE archived_at IS NULL AND status NOT IN ('Entregado al cliente','Cerrado','Anulado') ORDER BY id DESC").all();
     return rows.map(x=>({...x,days_open:Math.max(0,Math.floor((Date.now()-Date.parse(x.created_at))/86400000))})).filter(x=>x.days_open>=7);
   },
-  list:(query='')=>db.prepare('SELECT * FROM cases WHERE code LIKE ? OR customer_name LIKE ? OR invoice_number LIKE ? OR product LIKE ? OR phone LIKE ? ORDER BY id DESC LIMIT 500').all(...Array(5).fill('%'+String(query).trim()+'%')),
+  list:(query='',archived=false)=>db.prepare('SELECT * FROM cases WHERE '+(archived?'archived_at IS NOT NULL':'archived_at IS NULL')+' AND (code LIKE ? OR customer_name LIKE ? OR invoice_number LIKE ? OR product LIKE ? OR phone LIKE ?) ORDER BY id DESC LIMIT 500').all(...Array(5).fill('%'+String(query).trim()+'%')),
+  trash:(query='')=>db.prepare('SELECT * FROM cases WHERE archived_at IS NOT NULL AND (code LIKE ? OR customer_name LIKE ? OR product LIKE ?) ORDER BY id DESC LIMIT 500').all(...Array(3).fill('%'+String(query).trim()+'%')),
   timeline:id=>db.prepare('SELECT * FROM events WHERE case_id=? ORDER BY id DESC').all(id),
   updateStatus:(id,v)=>{
-   const row=one(id);if(!STATUSES.includes(v.status))throw Error('Estado inválido');
+   const row=one(id);if(row.archived_at||row.status==='Anulado')throw Error('Este RMA está archivado o anulado');if(!STATUSES.includes(v.status))throw Error('Estado inválido');
    const note=String(v.note||'').trim();
    if(v.status==='Garantía rechazada' && (!String(v.tests||row.tests||'').trim() || !String(v.diagnosis||row.diagnosis||'').trim() || !String(v.resolution_reason||row.resolution_reason||'').trim())) throw Error('El rechazo requiere pruebas, diagnóstico y fundamento documentados.');
    if(v.status==='Garantía rechazada' && !note)throw Error('Indicá el motivo del cambio de estado.');
